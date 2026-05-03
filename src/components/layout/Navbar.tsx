@@ -117,7 +117,7 @@ const Navbar: React.FC<NavbarProps> = ({ navbarData }) => {
               title="Favorilerim"
             >
               <Heart className="w-5 h-5" />
-              {favoriteCount > 0 && (
+              {mounted && favoriteCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 bg-cyan-500 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center ring-2 ring-white">
                   {favoriteCount}
                 </span>
@@ -131,7 +131,7 @@ const Navbar: React.FC<NavbarProps> = ({ navbarData }) => {
               title="Sepetim"
             >
               <ShoppingCart className="w-5 h-5" />
-              {cartCount > 0 && (
+              {mounted && cartCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 bg-cyan-500 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center ring-2 ring-white">
                   {cartCount}
                 </span>
@@ -220,7 +220,7 @@ const Navbar: React.FC<NavbarProps> = ({ navbarData }) => {
               className="relative text-gray-500 hover:text-cyan-600 p-2 transition-colors"
             >
               <ShoppingCart className="w-5 h-5" />
-              {cartCount > 0 && (
+              {mounted && cartCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 bg-cyan-500 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
                   {cartCount}
                 </span>
@@ -283,7 +283,7 @@ const Navbar: React.FC<NavbarProps> = ({ navbarData }) => {
                 <Heart className="w-4 h-4" />
                 Favorilerim
               </span>
-              {favoriteCount > 0 && (
+              {mounted && favoriteCount > 0 && (
                 <span className="bg-cyan-50 text-cyan-600 text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
                   {favoriteCount}
                 </span>

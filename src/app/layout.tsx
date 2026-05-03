@@ -104,14 +104,14 @@ export default async function RootLayout({
     const navbarData = await getNavbarData();
 
     return (
-        <html lang="tr">
+        <html lang="tr" suppressHydrationWarning>
             <head>
                 <script
                     type="application/ld+json"
                     dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
                 />
             </head>
-            <body className={inter.className}>
+            <body className={inter.className} suppressHydrationWarning>
                 <div id="root">
                     <ApiProvider>
                         <ClientProviders>
