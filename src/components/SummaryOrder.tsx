@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import type { Address } from "../types";
 import type { PaymentInfo } from "./CreditCart";
 import Basket from "./Basket";
@@ -42,6 +42,40 @@ const SummaryOrder: React.FC<SummaryOrderProps> = ({
   const [kvkkAccepted, setKvkkAccepted] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showKvkkModal, setShowKvkkModal] = useState(false);
+
+  const [siteName, setSiteName] = useState("Zmrelektronik");
+  const [domain, setDomain] = useState("zmrelektronik.com");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setDomain(window.location.host);
+    }
+    const fetchLogoAndName = async () => {
+      try {
+        const { getLogoAndNameApi } = await import("@/Api/controllers/ThemeController");
+        const res = await getLogoAndNameApi();
+        if (res?.data?.SiteNamePrimaryTitle) {
+          setSiteName(res.data.SiteNamePrimaryTitle);
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+    fetchLogoAndName();
+  }, []);
+
+  const replaceBrandDetails = (text: string) => {
+    if (!text) return "";
+    return text
+      .replace(/zmrelektronik\.com/gi, domain)
+      .replace(/Zmrelektronik/gi, siteName)
+      .replace(/ZmrElektronik/gi, siteName)
+      .replace(/ZMR Elektronik/gi, siteName);
+  };
+
+  const displayPreliminaryForm = replaceBrandDetails(PRELIMINARY_INFORMATION_FORM);
+  const displayDistanceSalesAgreement = replaceBrandDetails(DISTANCE_SALES_AGREEMENT);
+  const displayKvkkText = replaceBrandDetails(KVKK_TEXT);
 
   return (
     <>
@@ -320,7 +354,7 @@ const SummaryOrder: React.FC<SummaryOrderProps> = ({
               ÖN BİLGİLENDİRME FORMU
             </h3>
             <div className="whitespace-pre-wrap pl-1">
-              {PRELIMINARY_INFORMATION_FORM}
+              {displayPreliminaryForm}
             </div>
           </div>
 
@@ -329,7 +363,7 @@ const SummaryOrder: React.FC<SummaryOrderProps> = ({
               MESAFELİ SATIŞ SÖZLEŞMESİ
             </h3>
             <div className="whitespace-pre-wrap pl-1">
-              {DISTANCE_SALES_AGREEMENT}
+              {displayDistanceSalesAgreement}
             </div>
           </div>
 
@@ -355,7 +389,7 @@ const SummaryOrder: React.FC<SummaryOrderProps> = ({
       >
         <div className="space-y-6 text-sm text-gray-700 leading-relaxed font-sans p-2">
           <div className="bg-gray-50 rounded-lg p-4 border border-gray-100">
-            <div className="whitespace-pre-wrap pl-1">{KVKK_TEXT}</div>
+            <div className="whitespace-pre-wrap pl-1">{displayKvkkText}</div>
           </div>
 
           <div className="flex justify-end pt-4 sticky bottom-0 bg-white border-t border-gray-100 p-4 -mx-6 -mb-6 mt-4">

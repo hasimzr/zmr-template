@@ -168,8 +168,8 @@ export interface Address {
   isDefault?: boolean; // Varsayılan adres
 }
 
-export interface NavbarData {
+export interface LogoAndNameData {
   Logo: string;
-  siteNameOnex: string;
-  siteNameTwo: string;
+  SiteNamePrimaryTitle: string;
+  Favicon: string;
 }

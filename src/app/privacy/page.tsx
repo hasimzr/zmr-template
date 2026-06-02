@@ -1,12 +1,49 @@
 import { Metadata } from "next";
 import { Shield, FileText } from "lucide-react";
+import { getGeneralTitleAndMateTagApiServer, getContactApiServer } from "@/Api/controllers/ThemeController";
 
-export const metadata: Metadata = {
-  title: "Gizlilik Politikası",
-  description: "Zmrelektronik gizlilik politikası ve kullanım şartları. Verilerinizin güvenliği ve haklarınız hakkında bilgi edinin.",
-};
+export const dynamic = "force-dynamic";
 
-const Privacy = () => {
+export async function generateMetadata(): Promise<Metadata> {
+  let brandName = "Zmrelektronik";
+  try {
+    const generalRes = await getGeneralTitleAndMateTagApiServer();
+    if (generalRes?.data?.generalSeoTitle && generalRes.data.generalSeoTitle !== "örnek_metin" && generalRes.data.generalSeoTitle.trim() !== "") {
+      brandName = generalRes.data.generalSeoTitle;
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  return {
+    title: "Gizlilik Politikası",
+    description: `${brandName} gizlilik politikası ve kullanım şartları. Verilerinizin güvenliği ve haklarınız hakkında bilgi edinin.`,
+  };
+}
+
+const Privacy = async () => {
+  let brandName = "Zmrelektronik";
+  let contactEmail = "contact@zmrelektronik.com";
+
+  try {
+    const [generalRes, contactRes] = await Promise.all([
+      getGeneralTitleAndMateTagApiServer(),
+      getContactApiServer()
+    ]);
+
+    if (generalRes?.data?.generalSeoTitle && generalRes.data.generalSeoTitle !== "örnek_metin" && generalRes.data.generalSeoTitle.trim() !== "") {
+      brandName = generalRes.data.generalSeoTitle;
+    }
+
+    if (contactRes?.data?.contactEmailAddress && contactRes.data.contactEmailAddress !== "örnek_metin" && contactRes.data.contactEmailAddress.trim() !== "") {
+      contactEmail = contactRes.data.contactEmailAddress;
+    } else {
+      contactEmail = `contact@${brandName.toLowerCase().replace(/[^a-z0-9]/g, "")}.com`;
+    }
+  } catch (e) {
+    // ignore
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}
@@ -39,7 +76,7 @@ const Privacy = () => {
                 1. Bilgi Toplama ve Kullanımı
               </h3>
               <p>
-                E-Shop olarak, size daha iyi hizmet verebilmek için bazı kişisel
+                {brandName} olarak, size daha iyi hizmet verebilmek için bazı kişisel
                 bilgilerinizi topluyoruz. Bu bilgiler arasında adınız, e-posta
                 adresiniz, telefon numaranız ve teslimat adresiniz
                 bulunmaktadır.
@@ -139,7 +176,7 @@ const Privacy = () => {
                 1. Genel Koşullar
               </h3>
               <p>
-                E-Shop web sitesini kullanarak bu kullanım şartlarını kabul
+                {brandName} web sitesini kullanarak bu kullanım şartlarını kabul
                 etmiş sayılırsınız. Bu şartlara uymayı kabul etmiyorsanız,
                 sitemizi kullanmamalısınız.
               </p>
@@ -190,7 +227,7 @@ const Privacy = () => {
               </h3>
               <p>
                 Bu web sitesindeki tüm içerik, tasarım, logo, metin ve görseller
-                E-Shop'un mülkiyetindedir ve telif hakları ile korunmaktadır.
+                {brandName} firmasının mülkiyetindedir ve telif hakları ile korunmaktadır.
                 İzinsiz kullanım yasaktır.
               </p>
             </section>
@@ -200,7 +237,7 @@ const Privacy = () => {
                 6. Sorumluluk Reddi
               </h3>
               <p>
-                E-Shop, web sitesinin kesintisiz ve hatasız çalışacağını garanti
+                {brandName}, web sitesinin kesintisiz ve hatasız çalışacağını garanti
                 etmez. Teknik sorunlar nedeniyle oluşabilecek kayıplardan
                 sorumlu tutulamaz.
               </p>
@@ -212,21 +249,20 @@ const Privacy = () => {
               </h3>
               <p>
                 Gizlilik politikası ve kullanım şartları hakkında sorularınız
-                için
+                için{" "}
                 <a
                   href="/contact"
                   className="text-blue-600 hover:text-blue-700 font-semibold"
                 >
-                  {" "}
                   iletişim sayfamızdan
                 </a>{" "}
                 bize ulaşabilir veya{" "}
                 <a
-                  href="mailto:info@eshop.com"
+                  href={`mailto:${contactEmail}`}
                   className="text-blue-600 hover:text-blue-700 font-semibold"
                 >
-                  info@eshop.com
-                </a>
+                  {contactEmail}
+                </a>{" "}
                 adresine e-posta gönderebilirsiniz.
               </p>
             </section>

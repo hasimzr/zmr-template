@@ -17,14 +17,14 @@ import {
   Settings,
 } from "lucide-react";
 import { getFileUrl } from "@/utils/file";
-import { NavbarData } from "@/types";
+import { LogoAndNameData } from "@/types";
 import logo from "@/assets/logo.png";
 
 interface NavbarProps {
-  navbarData?: NavbarData;
+  logoAndNameData?: LogoAndNameData;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ navbarData }) => {
+const Navbar: React.FC<NavbarProps> = ({ logoAndNameData }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -58,9 +58,46 @@ const Navbar: React.FC<NavbarProps> = ({ navbarData }) => {
     navigate.push("/");
   };
 
-  const displayLogo = navbarData?.Logo || logo.src;
-  const displaySiteNameOne = navbarData?.siteNameOnex || "Zmr";
-  const displaySiteNameTwo = navbarData?.siteNameTwo || "elektronik";
+  const displayLogo = logoAndNameData?.Logo || logo.src;
+  const siteName = logoAndNameData?.SiteNamePrimaryTitle || "Zmrelektronik";
+
+  const splitSiteName = (title: string): { black: string; primary: string } => {
+    if (!title) return { black: "Zmr", primary: "elektronik" };
+    const spaceIndex = title.indexOf(" ");
+    if (spaceIndex !== -1) {
+      return {
+        black: title.substring(0, spaceIndex),
+        primary: title.substring(spaceIndex + 1)
+      };
+    }
+    const lowerTitle = title.toLowerCase();
+    const idx = lowerTitle.indexOf("elektronik");
+    if (idx !== -1) {
+      return {
+        black: title.substring(0, idx),
+        primary: title.substring(idx)
+      };
+    }
+    const idx2 = lowerTitle.indexOf("elektronx");
+    if (idx2 !== -1) {
+      return {
+        black: title.substring(0, idx2),
+        primary: title.substring(idx2)
+      };
+    }
+    if (lowerTitle.startsWith("zmr") && title.length > 3) {
+      return {
+        black: title.substring(0, 3),
+        primary: title.substring(3)
+      };
+    }
+    return {
+      black: title,
+      primary: ""
+    };
+  };
+
+  const { black: displaySiteNameBlack, primary: displaySiteNamePrimary } = splitSiteName(siteName);
 
   return (
     <nav className="bg-white/95 backdrop-blur-xl border-b border-gray-200/80 sticky top-0 z-50 shadow-sm">
@@ -71,13 +108,14 @@ const Navbar: React.FC<NavbarProps> = ({ navbarData }) => {
             <Link href="/" className="flex items-center gap-2 group">
               <img 
                 src={displayLogo} 
-                id="logo" 
-                data-id="logo"
-                alt={`${displaySiteNameOne}${displaySiteNameTwo} Logo`} 
+                id="Logo" 
+                data-id="Logo"
+                alt={`${displaySiteNameBlack} ${displaySiteNamePrimary} Logo`} 
                 className="w-10 h-10 object-contain group-hover:scale-110 transition-transform duration-300" 
               />
               <span className="text-xl font-black text-gray-900 tracking-tight">
-                <span id="siteNameOne" data-id="siteNameOne">{displaySiteNameOne}</span><span id="siteNameTwo" data-id="siteNameTwo" className="text-cyan-600">{displaySiteNameTwo}</span>
+                <span id="SiteNameBlackTitle" data-id="SiteNameBlackTitle">{displaySiteNameBlack}</span>
+                <span id="SiteNamePrimaryTitle" data-id="SiteNamePrimaryTitle" className="text-cyan-600">{displaySiteNamePrimary}</span>
               </span>
             </Link>
           </div>

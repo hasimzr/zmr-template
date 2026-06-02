@@ -1,10 +1,28 @@
 import { MetadataRoute } from 'next';
+import { headers } from 'next/headers';
+import { SitemapProductApiServer } from '@/Api/controllers/ProductController';
 
-export default function sitemap(): MetadataRoute.Sitemap {
-    const baseUrl = 'https://zmrelektronik.com';
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+    const headersList = await headers();
+    const host = headersList.get('host') || 'zmrelektronik.com';
+    const protocol = headersList.get('x-forwarded-proto') || 'https';
+    const baseUrl = `${protocol}://${host}`;
 
-    // In a real app, you would fetch products and categories from your API here
-    // and spread them into the results array.
+    let productRoutes: MetadataRoute.Sitemap = [];
+    try {
+        // Yeni özel sitemap API'sini kullanıyoruz (sayfalamasız, tüm ürünleri döner)
+        const productRes = await SitemapProductApiServer();
+        const products = Array.isArray(productRes.data) ? productRes.data : (productRes.data?.data || []);
+        
+        productRoutes = products.map((product: any) => ({
+            url: `${baseUrl}/product/${product.productUrl}`,
+            lastModified: new Date(),
+            changeFrequency: 'daily' as const,
+            priority: 0.7,
+        }));
+    } catch (error) {
+        console.error('Sitemap product fetch error:', error);
+    }
 
     return [
         {
@@ -43,5 +61,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
             changeFrequency: 'monthly',
             priority: 0.3,
         },
+        ...productRoutes,
     ];
 }
+

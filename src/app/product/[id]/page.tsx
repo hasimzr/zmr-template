@@ -8,16 +8,28 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
+import { getGeneralTitleAndMateTagApiServer } from "@/Api/controllers/ThemeController";
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
+
+  let brandName = "Zmrelektronik";
+  try {
+    const generalRes = await getGeneralTitleAndMateTagApiServer();
+    if (generalRes?.data?.generalSeoTitle && generalRes.data.generalSeoTitle !== "örnek_metin" && generalRes.data.generalSeoTitle.trim() !== "") {
+      brandName = generalRes.data.generalSeoTitle;
+    }
+  } catch (e) {
+    // ignore
+  }
 
   try {
     const response = await GetProductApiServer(id);
     if (response.status === 200) {
       const product = response.data;
       return {
-        title: `${product.title} - Zmrelektronik`,
-        description: product.description?.substring(0, 160).replace(/<[^>]*>?/gm, '') || "Zmrelektronik Elektronik Bileşen Detayı",
+        title: { absolute: `${product.title} - ${brandName}` },
+        description: product.description?.substring(0, 160).replace(/<[^>]*>?/gm, '') || `${brandName} Elektronik Bileşen Detayı`,
         openGraph: {
           images: product.images?.[0]?.imgName ? [product.images[0].imgName] : [],
         },
@@ -28,7 +40,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   return {
-    title: "Ürün Detayı - Zmrelektronik",
+    title: { absolute: `Ürün Detayı - ${brandName}` },
   };
 }
 

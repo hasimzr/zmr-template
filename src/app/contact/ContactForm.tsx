@@ -4,7 +4,17 @@ import { useState } from "react";
 import { Send } from "lucide-react";
 import type { ContactFormData } from "@/types";
 
-const ContactForm = () => {
+interface ContactFormProps {
+    formTitle?: string;
+    submitButtonText?: string;
+    submitButtonColor?: string;
+}
+
+const ContactForm: React.FC<ContactFormProps> = ({
+    formTitle = "Bize Mesaj Gönderin",
+    submitButtonText = "Gönder",
+    submitButtonColor = "#0891b2"
+}) => {
     const [formData, setFormData] = useState<ContactFormData>({
         name: "",
         email: "",
@@ -33,8 +43,13 @@ const ContactForm = () => {
 
     return (
         <div className="bg-white rounded-lg shadow-md p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">
-                Bize Mesaj Gönderin
+            <span id="contactFormSubmitButtonColor" data-id="contactFormSubmitButtonColor" className="hidden" />
+            <h2 
+                id="contactFormTitle"
+                data-id="contactFormTitle"
+                className="text-2xl font-bold text-gray-900 mb-6"
+            >
+                {formTitle}
             </h2>
 
             {submitted && (
@@ -104,10 +119,15 @@ const ContactForm = () => {
 
                 <button
                     type="submit"
-                    className="w-full bg-gradient-to-r from-cyan-600 to-blue-700 text-white py-3 rounded-lg font-semibold hover:from-cyan-700 hover:to-blue-800 transition-all shadow-lg flex items-center justify-center space-x-2"
+                    id="contactFormSubmitButtonText"
+                    data-id="contactFormSubmitButtonText"
+                    className="w-full text-white py-3 rounded-lg font-semibold transition-all shadow-lg flex items-center justify-center space-x-2 hover:opacity-90"
+                    style={{
+                        backgroundColor: submitButtonColor,
+                    }}
                 >
                     <Send className="w-5 h-5" />
-                    <span>Gönder</span>
+                    <span>{submitButtonText}</span>
                 </button>
             </form>
         </div>

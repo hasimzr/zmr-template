@@ -40,3 +40,12 @@ export const getFavoriteStatusApi = (productId: string) =>
 export const getFavoritesApi = () => axios.get(`/favorites/my/list`);
 
 export const getFavoritesCountApi = () => axios.get(`/favorites/my/count`);
+
+export const SitemapProductApi = () =>
+  axios.get("/products/all/for/sitesmap");
+
+export const SitemapProductApiServer = async () => {
+  const api = await ServerApi();
+  return api.get("/products/all/for/sitesmap");
+}
+

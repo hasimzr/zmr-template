@@ -141,6 +141,7 @@ const ModalCompanentClient: React.FC<ModalComponentProps> = ({
             overlayClassName="modal-overlay"
             shouldCloseOnOverlayClick={persistent ? false : closeOnOverlayClick}
             shouldCloseOnEsc={!persistent}
+            ariaHideApp={false}
         >
             <div
                 className={

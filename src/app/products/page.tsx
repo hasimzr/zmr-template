@@ -1,16 +1,63 @@
-import React from "react";
+import React, { cache } from "react";
 import { Metadata } from "next";
 import { AllProductApiServer, ProductApiServer } from "@/Api/controllers/ProductController";
 import { getAllCategoriesApiServer } from "@/Api/controllers/CategoryController";
 import ProductsClient from "@/components/product/ProductsClient";
+import { getProductsPageTitleAndMateTagApiServer, getGeneralTitleAndMateTagApiServer } from "@/Api/controllers/ThemeController";
+import ProductsMetadataPreviewClient from "@/components/common/ProductsMetadataPreviewClient";
+import { getPageTitle } from "@/utils/seo";
+
+export const dynamic = "force-dynamic";
 
 interface PageProps {
   searchParams: Promise<{ category?: string; subcategory?: string; page?: string }>;
 }
 
+const getProductsMetadataData = cache(async () => {
+  try {
+    const res = await getProductsPageTitleAndMateTagApiServer();
+    return res?.data || null;
+  } catch (error) {
+    console.error("Products server-side metadata fetch error:", error);
+    return null;
+  }
+});
+
+const getGeneralMetadata = cache(async () => {
+  try {
+    const res = await getGeneralTitleAndMateTagApiServer();
+    return res?.data || null;
+  } catch (error) {
+    return null;
+  }
+});
+
 export async function generateMetadata({ searchParams }: PageProps): Promise<Metadata> {
   const params = await searchParams;
   const categoryId = params.category;
+  
+  const [data, generalData] = await Promise.all([
+    getProductsMetadataData(),
+    getGeneralMetadata()
+  ]);
+
+  const brandName = generalData?.generalSeoTitle && generalData.generalSeoTitle !== "örnek_metin" && generalData.generalSeoTitle.trim() !== ""
+    ? generalData.generalSeoTitle
+    : "Zmrelektronik";
+
+  const rawTitle = data?.productsPageTitle && data.productsPageTitle !== "örnek_metin" && data.productsPageTitle.trim() !== ""
+    ? data.productsPageTitle
+    : "Tüm Ürünler - Zmrelektronik";
+
+  const dynamicTitle = getPageTitle(rawTitle, "Tüm Ürünler - Zmrelektronik", brandName);
+
+  const dynamicDescription = data?.productsPageMetaDescription && data.productsPageMetaDescription !== "örnek_metin" && data.productsPageMetaDescription.trim() !== ""
+    ? data.productsPageMetaDescription
+    : "Zmrelektronik - Elektronik bileşenler, sensörler ve geliştirme kartları.";
+
+  const dynamicKeywords = data?.productsPageMetaKeyWord && data.productsPageMetaKeyWord !== "örnek_metin" && data.productsPageMetaKeyWord.trim() !== ""
+    ? data.productsPageMetaKeyWord.split(",").map((k: string) => k.trim()).filter(Boolean)
+    : ["elektronik bileşen", "arduino", "raspberry pi", "sensörler", "geliştirme kartları", "robotik", "mühendislik"];
 
   if (categoryId) {
     try {
@@ -18,9 +65,17 @@ export async function generateMetadata({ searchParams }: PageProps): Promise<Met
       const categories = resp.data || [];
       const category = categories.find((c: any) => String(c.id) === String(categoryId));
       if (category) {
+        const titleSuffix = dynamicTitle.includes(" - ") 
+          ? dynamicTitle.split(" - ").slice(1).join(" - ") 
+          : brandName;
         return {
-          title: `${category.categoryName} - Zmrelektronik`,
+          title: { absolute: `${category.categoryName} - ${titleSuffix}` },
           description: `${category.categoryName} kategorisindeki tüm elektronik bileşenleri keşfedin.`,
+          keywords: dynamicKeywords,
+          openGraph: {
+            title: `${category.categoryName} - ${titleSuffix}`,
+            description: `${category.categoryName} kategorisindeki tüm elektronik bileşenleri keşfedin.`,
+          }
         };
       }
     } catch (e) {
@@ -29,8 +84,13 @@ export async function generateMetadata({ searchParams }: PageProps): Promise<Met
   }
 
   return {
-    title: "Tüm Ürünler - Zmrelektronik",
-    description: "Zmrelektronik - Elektronik bileşenler, sensörler ve geliştirme kartları.",
+    title: { absolute: dynamicTitle },
+    description: dynamicDescription,
+    keywords: dynamicKeywords,
+    openGraph: {
+      title: dynamicTitle,
+      description: dynamicDescription,
+    }
   };
 }
 
@@ -43,10 +103,18 @@ export default async function ProductsPage({ searchParams }: PageProps) {
   let initialProducts = [];
   let categories = [];
   let hasMore = true;
+  let metadataData = null;
 
   try {
-    const categoriesRes = await getAllCategoriesApiServer();
+    const [categoriesRes, metaData] = await Promise.all([
+      getAllCategoriesApiServer(),
+      getProductsMetadataData().catch(err => {
+        console.error("Products page metadata fetch error:", err);
+        return null;
+      })
+    ]);
     categories = categoriesRes.data || [];
+    metadataData = metaData;
 
     let productsRes;
     if (categoryId || subcategoryId) {
@@ -76,10 +144,14 @@ export default async function ProductsPage({ searchParams }: PageProps) {
   }
 
   return (
-    <ProductsClient
-      initialProducts={initialProducts}
-      categories={categories}
-      initialHasMore={hasMore}
-    />
+    <>
+      <ProductsMetadataPreviewClient initialData={metadataData} />
+      <ProductsClient
+        initialProducts={initialProducts}
+        categories={categories}
+        initialHasMore={hasMore}
+      />
+    </>
   );
 }
+

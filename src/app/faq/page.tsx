@@ -1,10 +1,25 @@
 import { Metadata } from "next";
 import FAQContent, { FAQItem } from "./FAQContent";
+import { getGeneralTitleAndMateTagApiServer } from "@/Api/controllers/ThemeController";
 
-export const metadata: Metadata = {
-  title: "Sık Sorulan Sorular",
-  description: "Zmrelektronik hakkında sık sorulan sorular. Sipariş, ödeme, iade ve üyelik süreçleri hakkında bilgi edinin.",
-};
+export const dynamic = "force-dynamic";
+
+export async function generateMetadata(): Promise<Metadata> {
+  let brandName = "Zmrelektronik";
+  try {
+    const generalRes = await getGeneralTitleAndMateTagApiServer();
+    if (generalRes?.data?.generalSeoTitle && generalRes.data.generalSeoTitle !== "örnek_metin" && generalRes.data.generalSeoTitle.trim() !== "") {
+      brandName = generalRes.data.generalSeoTitle;
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  return {
+    title: "Sık Sorulan Sorular",
+    description: `${brandName} hakkında sık sorulan sorular. Sipariş, ödeme, iade ve üyelik süreçleri hakkında bilgi edinin.`,
+  };
+}
 
 const faqData: FAQItem[] = [
   {
