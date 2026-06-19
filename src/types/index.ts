@@ -170,6 +170,7 @@ export interface Address {
 
 export interface LogoAndNameData {
   Logo: string;
+  SiteNameBlackTitle?: string;
   SiteNamePrimaryTitle: string;
   Favicon: string;
 }

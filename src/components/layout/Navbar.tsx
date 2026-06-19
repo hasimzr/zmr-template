@@ -59,7 +59,6 @@ const Navbar: React.FC<NavbarProps> = ({ logoAndNameData }) => {
   };
 
   const displayLogo = logoAndNameData?.Logo || logo.src;
-  const siteName = logoAndNameData?.SiteNamePrimaryTitle || "Zmrelektronik";
 
   const splitSiteName = (title: string): { black: string; primary: string } => {
     if (!title) return { black: "Zmr", primary: "elektronik" };
@@ -97,7 +96,18 @@ const Navbar: React.FC<NavbarProps> = ({ logoAndNameData }) => {
     };
   };
 
-  const { black: displaySiteNameBlack, primary: displaySiteNamePrimary } = splitSiteName(siteName);
+  let displaySiteNameBlack = "";
+  let displaySiteNamePrimary = "";
+
+  if (logoAndNameData && logoAndNameData.SiteNameBlackTitle !== undefined && logoAndNameData.SiteNameBlackTitle !== null) {
+    displaySiteNameBlack = logoAndNameData.SiteNameBlackTitle;
+    displaySiteNamePrimary = logoAndNameData.SiteNamePrimaryTitle || "";
+  } else {
+    const siteName = logoAndNameData?.SiteNamePrimaryTitle || "Zmrelektronik";
+    const { black, primary } = splitSiteName(siteName);
+    displaySiteNameBlack = black;
+    displaySiteNamePrimary = primary;
+  }
 
   return (
     <nav className="bg-white/95 backdrop-blur-xl border-b border-gray-200/80 sticky top-0 z-50 shadow-sm">

@@ -142,7 +142,18 @@ const Footer: React.FC<FooterProps> = ({ logoAndNameData, initialData, initialCo
     };
   };
 
-  const { black: displaySiteNameBlack, primary: displaySiteNamePrimary } = splitSiteName(siteName);
+  let displaySiteNameBlack = "";
+  let displaySiteNamePrimary = "";
+
+  if (logoAndNameData && logoAndNameData.SiteNameBlackTitle !== undefined && logoAndNameData.SiteNameBlackTitle !== null) {
+    displaySiteNameBlack = logoAndNameData.SiteNameBlackTitle;
+    displaySiteNamePrimary = logoAndNameData.SiteNamePrimaryTitle || "";
+  } else {
+    const siteName = logoAndNameData?.SiteNamePrimaryTitle || "Zmrelektronik";
+    const { black, primary } = splitSiteName(siteName);
+    displaySiteNameBlack = black;
+    displaySiteNamePrimary = primary;
+  }
 
   // Sync state if server side data changes
   useEffect(() => {
