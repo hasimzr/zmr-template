@@ -1,5 +1,12 @@
 "use client";
 import { useState, useEffect } from "react";
+import toast from "react-hot-toast";
+import ModalComponent from "./ModalCompanent";
+import {
+    PRELIMINARY_INFORMATION_FORM,
+    DISTANCE_SALES_AGREEMENT,
+    KVKK_TEXT,
+} from "@/data/contracts";
 import {
     CreditCard,
     Lock,
@@ -7,13 +14,14 @@ import {
     User,
     Banknote,
     Wallet,
+    ShieldCheck,
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { getPaymentOptionsApi } from "@/Api/controllers/OrderController";
 import type { PaymentOptions, PaymentMethodType, BankAccount } from "../types";
 
 interface CreditCartClientProps {
-    onComplete: (paymentInfo: PaymentInfo) => void;
+    onComplete: (paymentInfo: PaymentInfo) => void | Promise<void>;
     orderData?: {
         firstName: string | null;
         lastName: string | null;
@@ -48,6 +56,45 @@ const CreditCartClient = ({
     const [selectedMethod, setSelectedMethod] =
         useState<PaymentMethodType | null>(paymentInfo?.paymentMethod || null);
     const [isLoadingOptions, setIsLoadingOptions] = useState(true);
+
+    const [termsAccepted, setTermsAccepted] = useState(false);
+    const [kvkkAccepted, setKvkkAccepted] = useState(false);
+    const [showTermsModal, setShowTermsModal] = useState(false);
+    const [showKvkkModal, setShowKvkkModal] = useState(false);
+
+    const [siteName, setSiteName] = useState("Zmrelektronik");
+    const [domain, setDomain] = useState("zmrelektronik.com");
+
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            setDomain(window.location.host);
+        }
+        const fetchLogoAndName = async () => {
+            try {
+                const { getLogoAndNameApi } = await import("@/Api/controllers/ThemeController");
+                const res = await getLogoAndNameApi();
+                if (res?.data?.SiteNamePrimaryTitle) {
+                    setSiteName(res.data.SiteNamePrimaryTitle);
+                }
+            } catch (e) {
+                // ignore
+            }
+        };
+        fetchLogoAndName();
+    }, []);
+
+    const replaceBrandDetails = (text: string) => {
+        if (!text) return "";
+        return text
+            .replace(/zmrelektronik\.com/gi, domain)
+            .replace(/Zmrelektronik/gi, siteName)
+            .replace(/ZmrElektronik/gi, siteName)
+            .replace(/ZMR Elektronik/gi, siteName);
+    };
+
+    const displayPreliminaryForm = replaceBrandDetails(PRELIMINARY_INFORMATION_FORM);
+    const displayDistanceSalesAgreement = replaceBrandDetails(DISTANCE_SALES_AGREEMENT);
+    const displayKvkkText = replaceBrandDetails(KVKK_TEXT);
 
     const [form, setForm] = useState<PaymentInfo>({
         paymentMethod: paymentInfo?.paymentMethod || "creditCard",
@@ -223,7 +270,13 @@ const CreditCartClient = ({
 
         // Ödeme yöntemi seçilmemişse
         if (!selectedMethod) {
-            alert("Lütfen bir ödeme yöntemi seçin");
+            toast.error("Lütfen bir ödeme yöntemi seçin");
+            return false;
+        }
+
+        // Sözleşme ve KVKK kontrolü
+        if (!termsAccepted || !kvkkAccepted) {
+            toast.error("Lütfen Ön Bilgilendirme Formu, Mesafeli Satış Sözleşmesi ve KVKK Aydınlatma Metni'ni onaylayın.");
             return false;
         }
 
@@ -296,25 +349,28 @@ const CreditCartClient = ({
         setIsProcessing(true);
 
         const provider = paymentOptions?.creditCard?.provider;
+        const paymentData: PaymentInfo = {
+            paymentMethod: selectedMethod!,
+            provider: provider,
+            ...(selectedMethod === "creditCard" && provider !== "iyzico" && provider !== "paytr" && {
+                cardNumber: form.cardNumber,
+                cardHolder: form.cardHolder,
+                expiryMonth: form.expiryMonth,
+                expiryYear: form.expiryYear,
+                cvv: form.cvv,
+            }),
+            ...(selectedMethod === "bankTransfer" && {
+                selectedBank: form.selectedBank,
+            }),
+        };
 
-        setTimeout(() => {
+        try {
+            await onComplete(paymentData);
+        } catch (err) {
+            console.error(err);
+        } finally {
             setIsProcessing(false);
-            const paymentData: PaymentInfo = {
-                paymentMethod: selectedMethod!,
-                provider: provider,
-                ...(selectedMethod === "creditCard" && provider !== "iyzico" && provider !== "paytr" && {
-                    cardNumber: form.cardNumber,
-                    cardHolder: form.cardHolder,
-                    expiryMonth: form.expiryMonth,
-                    expiryYear: form.expiryYear,
-                    cvv: form.cvv,
-                }),
-                ...(selectedMethod === "bankTransfer" && {
-                    selectedBank: form.selectedBank,
-                }),
-            };
-            onComplete(paymentData);
-        }, 500);
+        }
     };
 
     const getCardType = (number: string) => {
@@ -325,6 +381,59 @@ const CreditCartClient = ({
         if (firstDigit === "3") return "AMEX";
         return "CARD";
     };
+
+    const renderContractCheckboxes = () => (
+        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 sm:p-5 my-4 space-y-3">
+            <h4 className="font-semibold text-gray-900 text-sm mb-1 flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-cyan-600" />
+                Sözleşmeler ve Yasal Onaylar
+            </h4>
+
+            <div className="flex items-start gap-3">
+                <div className="flex items-center h-5 mt-0.5">
+                    <input
+                        id="credit-terms"
+                        type="checkbox"
+                        checked={termsAccepted}
+                        onChange={(e) => setTermsAccepted(e.target.checked)}
+                        className="w-4 h-4 border-gray-300 rounded text-cyan-600 focus:ring-cyan-500 cursor-pointer"
+                    />
+                </div>
+                <label htmlFor="credit-terms" className="text-xs sm:text-sm text-gray-700 select-none">
+                    <button
+                        type="button"
+                        onClick={() => setShowTermsModal(true)}
+                        className="text-cyan-600 hover:text-cyan-800 underline font-medium cursor-pointer text-left"
+                    >
+                        Ön Bilgilendirme Formu ve Mesafeli Satış Sözleşmesi
+                    </button>
+                    'ni okudum, onaylıyorum. <span className="text-red-500">*</span>
+                </label>
+            </div>
+
+            <div className="flex items-start gap-3">
+                <div className="flex items-center h-5 mt-0.5">
+                    <input
+                        id="credit-kvkk"
+                        type="checkbox"
+                        checked={kvkkAccepted}
+                        onChange={(e) => setKvkkAccepted(e.target.checked)}
+                        className="w-4 h-4 border-gray-300 rounded text-cyan-600 focus:ring-cyan-500 cursor-pointer"
+                    />
+                </div>
+                <label htmlFor="credit-kvkk" className="text-xs sm:text-sm text-gray-700 select-none">
+                    <button
+                        type="button"
+                        onClick={() => setShowKvkkModal(true)}
+                        className="text-cyan-600 hover:text-cyan-800 underline font-medium cursor-pointer text-left"
+                    >
+                        KVKK Aydınlatma Metni
+                    </button>
+                    'ni okudum. <span className="text-red-500">*</span>
+                </label>
+            </div>
+        </div>
+    );
 
     return (
         <div className="lg:col-span-2">
@@ -526,15 +635,17 @@ const CreditCartClient = ({
                                             </p>
                                         </div>
 
-                                        <button
-                                            type="button"
-                                            onClick={() => handleSubmit()}
-                                            disabled={isProcessing}
-                                            className={`w-full py-4 rounded-xl font-semibold text-white transition-all items-center justify-center gap-2 shadow-md hover:shadow-xl hidden lg:flex ${isProcessing
-                                                ? "bg-gray-400 cursor-not-allowed"
-                                                : "bg-gradient-to-r from-cyan-600 to-blue-700 hover:from-cyan-700 hover:to-blue-800 transform hover:scale-[1.02] active:scale-[0.98]"
-                                                }`}
-                                        >
+                                            {renderContractCheckboxes()}
+
+                                            <button
+                                                type="button"
+                                                onClick={() => handleSubmit()}
+                                                disabled={isProcessing || !termsAccepted || !kvkkAccepted}
+                                                className={`w-full py-4 rounded-xl font-semibold text-white transition-all items-center justify-center gap-2 shadow-md hover:shadow-xl hidden lg:flex ${isProcessing || !termsAccepted || !kvkkAccepted
+                                                    ? "bg-gray-400 cursor-not-allowed opacity-75"
+                                                    : "bg-gradient-to-r from-cyan-600 to-blue-700 hover:from-cyan-700 hover:to-blue-800 transform hover:scale-[1.02] active:scale-[0.98]"
+                                                    }`}
+                                            >
                                             {isProcessing ? (
                                                 <>
                                                     <div className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -751,12 +862,14 @@ const CreditCartClient = ({
                                                 </div>
                                             </div>
 
+                                            {renderContractCheckboxes()}
+
                                             {/* Ödeme Butonu */}
                                             <button
                                                 type="submit"
-                                                disabled={isProcessing}
-                                                className={`w-full py-4 rounded-xl font-semibold text-white transition-all items-center justify-center gap-2 shadow-md hover:shadow-xl hidden lg:flex ${isProcessing
-                                                    ? "bg-gray-400 cursor-not-allowed"
+                                                disabled={isProcessing || !termsAccepted || !kvkkAccepted}
+                                                className={`w-full py-4 rounded-xl font-semibold text-white transition-all items-center justify-center gap-2 shadow-md hover:shadow-xl hidden lg:flex ${isProcessing || !termsAccepted || !kvkkAccepted
+                                                    ? "bg-gray-400 cursor-not-allowed opacity-75"
                                                     : "bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 transform hover:scale-[1.02] active:scale-[0.98]"
                                                     }`}
                                             >
@@ -864,12 +977,14 @@ const CreditCartClient = ({
                                         )}
                                     </div>
 
+                                    {renderContractCheckboxes()}
+
                                     {/* Ödeme Butonu (Banka Transferi) */}
                                     <button
                                         onClick={() => handleSubmit()}
-                                        disabled={isProcessing || !form.selectedBank}
-                                        className={`w-full py-4 rounded-xl font-semibold text-white transition-all items-center justify-center gap-2 shadow-md hover:shadow-xl hidden lg:flex ${isProcessing || !form.selectedBank
-                                            ? "bg-gray-400 cursor-not-allowed"
+                                        disabled={isProcessing || !form.selectedBank || !termsAccepted || !kvkkAccepted}
+                                        className={`w-full py-4 rounded-xl font-semibold text-white transition-all items-center justify-center gap-2 shadow-md hover:shadow-xl hidden lg:flex ${isProcessing || !form.selectedBank || !termsAccepted || !kvkkAccepted
+                                            ? "bg-gray-400 cursor-not-allowed opacity-75"
                                             : "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 transform hover:scale-[1.02] active:scale-[0.98]"
                                             }`}
                                     >
@@ -904,11 +1019,13 @@ const CreditCartClient = ({
                                     </p>
                                 </div>
 
+                                {renderContractCheckboxes()}
+
                                 <button
                                     onClick={() => handleSubmit()}
-                                    disabled={isProcessing}
-                                    className={`w-full py-4 rounded-xl font-semibold text-white transition-all items-center justify-center gap-2 shadow-md hover:shadow-xl hidden lg:flex ${isProcessing
-                                        ? "bg-gray-400 cursor-not-allowed"
+                                    disabled={isProcessing || !termsAccepted || !kvkkAccepted}
+                                    className={`w-full py-4 rounded-xl font-semibold text-white transition-all items-center justify-center gap-2 shadow-md hover:shadow-xl hidden lg:flex ${isProcessing || !termsAccepted || !kvkkAccepted
+                                        ? "bg-gray-400 cursor-not-allowed opacity-75"
                                         : "bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 transform hover:scale-[1.02] active:scale-[0.98]"
                                         }`}
                                 >
@@ -931,10 +1048,10 @@ const CreditCartClient = ({
                         <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-50 lg:hidden">
                             <button
                                 onClick={() => handleSubmit()}
-                                disabled={isProcessing || (selectedMethod === 'bankTransfer' && !form.selectedBank) || !selectedMethod}
+                                disabled={isProcessing || (selectedMethod === 'bankTransfer' && !form.selectedBank) || !selectedMethod || !termsAccepted || !kvkkAccepted}
                                 className={`w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-md active:scale-[0.98] ${
-                                    isProcessing || (selectedMethod === 'bankTransfer' && !form.selectedBank) || !selectedMethod
-                                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                                    isProcessing || (selectedMethod === 'bankTransfer' && !form.selectedBank) || !selectedMethod || !termsAccepted || !kvkkAccepted
+                                    ? "bg-gray-200 text-gray-400 cursor-not-allowed opacity-75"
                                     : selectedMethod === "creditCard"
                                         ? "bg-gradient-to-r from-green-600 to-emerald-600 text-white"
                                         : selectedMethod === "bankTransfer"
@@ -966,6 +1083,71 @@ const CreditCartClient = ({
                     </>
                 )}
             </div>
+
+            {/* Sözleşme Modalları */}
+            <ModalComponent
+                isOpen={showTermsModal}
+                onClose={() => setShowTermsModal(false)}
+                title="Ön Bilgilendirme Formu ve Satış Sözleşmesi"
+                size="lg"
+            >
+                <div className="space-y-6 text-sm text-gray-700 leading-relaxed font-sans p-2">
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-100">
+                        <h3 className="text-lg font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">
+                            ÖN BİLGİLENDİRME FORMU
+                        </h3>
+                        <div className="whitespace-pre-wrap pl-1">
+                            {displayPreliminaryForm}
+                        </div>
+                    </div>
+
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-100">
+                        <h3 className="text-lg font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">
+                            MESAFELİ SATIŞ SÖZLEŞMESİ
+                        </h3>
+                        <div className="whitespace-pre-wrap pl-1">
+                            {displayDistanceSalesAgreement}
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end pt-4 sticky bottom-0 bg-white border-t border-gray-100 p-4 -mx-6 -mb-6 mt-4">
+                        <button
+                            onClick={() => {
+                                setTermsAccepted(true);
+                                setShowTermsModal(false);
+                            }}
+                            className="bg-gradient-to-r from-cyan-600 to-blue-700 text-white px-6 py-2.5 rounded-lg font-semibold hover:from-cyan-700 hover:to-blue-800 transition shadow-sm hover:shadow"
+                        >
+                            Okudum, Onaylıyorum
+                        </button>
+                    </div>
+                </div>
+            </ModalComponent>
+
+            <ModalComponent
+                isOpen={showKvkkModal}
+                onClose={() => setShowKvkkModal(false)}
+                title="KVKK Aydınlatma Metni"
+                size="lg"
+            >
+                <div className="space-y-6 text-sm text-gray-700 leading-relaxed font-sans p-2">
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-100">
+                        <div className="whitespace-pre-wrap pl-1">{displayKvkkText}</div>
+                    </div>
+
+                    <div className="flex justify-end pt-4 sticky bottom-0 bg-white border-t border-gray-100 p-4 -mx-6 -mb-6 mt-4">
+                        <button
+                            onClick={() => {
+                                setKvkkAccepted(true);
+                                setShowKvkkModal(false);
+                            }}
+                            className="bg-gradient-to-r from-cyan-600 to-blue-700 text-white px-6 py-2.5 rounded-lg font-semibold hover:from-cyan-700 hover:to-blue-800 transition shadow-sm hover:shadow"
+                        >
+                            Okudum
+                        </button>
+                    </div>
+                </div>
+            </ModalComponent>
         </div>
     );
 };

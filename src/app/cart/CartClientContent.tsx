@@ -161,26 +161,87 @@ export default function CartClientContent({ orderIdParam }: CartClientContentPro
         setStep(2);
     };
 
-    const handleSubmitOrder = async () => {
-        const toOptionKeyArray = (item: any) => {
-            const optionMap = item?.selectedOptions || {};
-            if (!item?.product?.features || !Array.isArray(item.product.features)) {
-                return Object.values(optionMap);
+    const toOptionKeyArray = (item: any) => {
+        const optionMap = item?.selectedOptions || {};
+        if (!item?.product?.features || !Array.isArray(item.product.features)) {
+            return Object.values(optionMap);
+        }
+
+        return Object.entries(optionMap).map(([featKey, selectedValue]) => {
+            const feature = item.product.features.find(
+                (f: any) => String(f.id || f.title) === String(featKey),
+            );
+            const matchedOption = feature?.options?.find(
+                (o: any) =>
+                    String(o.optionKey ?? o.id) === String(selectedValue) ||
+                    String(o.id) === String(selectedValue),
+            );
+            return matchedOption?.optionKey ?? selectedValue;
+        });
+    };
+
+    const handlePaymentMethodComplete = async (payment: PaymentInfo) => {
+        setPaymentInfo(payment);
+        const provider = payment.provider || paymentOptions?.creditCard?.provider;
+
+        if (payment.paymentMethod === "creditCard" && (provider === "paytr" || provider === "iyzico")) {
+            const payload: any = {
+                email: orderData.email,
+                firstName: orderData.firstName,
+                lastName: orderData.lastName,
+                phoneNumber: orderData.phone,
+                addressLine: selectedAddress?.addressLine,
+                fullName: selectedAddress?.fullName,
+                city: selectedAddress?.city,
+                companyName: selectedAddress?.companyName,
+                district: selectedAddress?.district,
+                isDefault: selectedAddress?.isDefault,
+                neighborhood: selectedAddress?.neighborhood,
+                phone: selectedAddress?.phone,
+                postalCode: selectedAddress?.postalCode,
+                taxNumber: selectedAddress?.taxNumber,
+                taxOffice: selectedAddress?.taxOffice,
+                title: selectedAddress?.title,
+                type: selectedAddress?.type,
+                paymentMethod: payment.paymentMethod,
+                orderProductList: cartItems.map((item: any) => ({
+                    productId: item.product.id,
+                    quantity: item.quantity,
+                    selectedOptions: toOptionKeyArray(item),
+                })),
+            };
+
+            try {
+                if (provider === "paytr") {
+                    const res = await initializePaytrPaymentApi(payload);
+                    if (res?.data) {
+                        const htmlContent = typeof res.data === "string" ? res.data : JSON.stringify(res.data);
+                        setPaymentHtml(htmlContent);
+                    } else {
+                        toast.error("PayTR ödeme bağlantısı oluşturulamadı.");
+                    }
+                } else if (provider === "iyzico") {
+                    const res = await initializeIyzicoPaymentApi(payload);
+                    if (res?.data) {
+                        let htmlContent = typeof res.data === "string" ? res.data : JSON.stringify(res.data);
+                        htmlContent = htmlContent
+                            .replace(/(class|className)\s*=\s*\\?["']\s*popup\s*\\?["']/g, 'class="responsive"')
+                            .replace(/\\?["']?pageType\\?["']?\s*:\s*\\?["']\s*popup\s*\\?["']/g, '"pageType": "responsive"');
+                        setPaymentHtml(htmlContent);
+                    } else {
+                        toast.error("İyzico ödeme bağlantısı oluşturulamadı.");
+                    }
+                }
+            } catch (err: any) {
+                console.error("Ödeme başlatma hatası:", err);
+                toast.error(err?.response?.data?.message || "Ödeme bağlantısı oluşturulurken bir hata oluştu.");
             }
+        } else {
+            setStep(isAuthenticated ? 4 : 5);
+        }
+    };
 
-            return Object.entries(optionMap).map(([featKey, selectedValue]) => {
-                const feature = item.product.features.find(
-                    (f: any) => String(f.id || f.title) === String(featKey),
-                );
-                const matchedOption = feature?.options?.find(
-                    (o: any) =>
-                        String(o.optionKey ?? o.id) === String(selectedValue) ||
-                        String(o.id) === String(selectedValue),
-                );
-                return matchedOption?.optionKey ?? selectedValue;
-            });
-        };
-
+    const handleSubmitOrder = async () => {
         const payload: any = {
             email: orderData.email,
             firstName: orderData.firstName,
@@ -453,20 +514,14 @@ export default function CartClientContent({ orderIdParam }: CartClientContentPro
                                 <CreditCart
                                     orderData={orderData}
                                     paymentInfo={paymentInfo}
-                                    onComplete={(payment) => {
-                                        setPaymentInfo(payment);
-                                        setStep(4);
-                                    }}
+                                    onComplete={handlePaymentMethodComplete}
                                 />
                             )}
                             {step === 4 && !isAuthenticated && (
                                 <CreditCart
                                     orderData={orderData}
                                     paymentInfo={paymentInfo}
-                                    onComplete={(payment) => {
-                                        setPaymentInfo(payment);
-                                        setStep(5);
-                                    }}
+                                    onComplete={handlePaymentMethodComplete}
                                 />
                             )}
                         </div>
