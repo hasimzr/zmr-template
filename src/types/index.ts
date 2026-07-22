@@ -116,6 +116,7 @@ export interface BankAccount {
 export interface PaymentOptions {
   creditCard: {
     enabled: boolean;
+    provider?: "iyzico" | "paytr" | string;
   };
   cashOnDelivery: boolean;
   bankTransfer: {

@@ -25,6 +25,7 @@ interface CreditCartClientProps {
 
 export interface PaymentInfo {
     paymentMethod: PaymentMethodType;
+    provider?: "iyzico" | "paytr" | string;
     // Kredi kartı bilgileri
     cardNumber?: string;
     cardHolder?: string;
@@ -228,46 +229,50 @@ const CreditCartClient = ({
 
         // Kredi kartı seçildiyse kart bilgilerini kontrol et
         if (selectedMethod === "creditCard") {
-            // Kart numarası kontrolü
-            if (!form.cardNumber) {
-                newErrors.cardNumber = "Kart numarası gerekli";
-            } else if (form.cardNumber.length !== 16) {
-                newErrors.cardNumber = "Kart numarası 16 haneli olmalıdır";
-            }
-
-            // Kart sahibi kontrolü
-            if (!form.cardHolder?.trim()) {
-                newErrors.cardHolder = "Kart sahibi adı gerekli";
-            } else if (form.cardHolder.trim().length < 3) {
-                newErrors.cardHolder = "Geçerli bir ad soyad girin";
-            }
-
-            // Ay kontrolü
-            if (!form.expiryMonth) {
-                newErrors.expiryMonth = "Ay gerekli";
-            } else {
-                const month = parseInt(form.expiryMonth);
-                if (month < 1 || month > 12) {
-                    newErrors.expiryMonth = "Geçersiz ay";
+            const provider = paymentOptions?.creditCard?.provider;
+            // Sağlayıcı iyzico veya paytr ise iframe/form kullanılacağından manuel kart alanı doğrulamasını atla
+            if (provider !== "iyzico" && provider !== "paytr") {
+                // Kart numarası kontrolü
+                if (!form.cardNumber) {
+                    newErrors.cardNumber = "Kart numarası gerekli";
+                } else if (form.cardNumber.length !== 16) {
+                    newErrors.cardNumber = "Kart numarası 16 haneli olmalıdır";
                 }
-            }
 
-            // Yıl kontrolü
-            if (!form.expiryYear) {
-                newErrors.expiryYear = "Yıl gerekli";
-            } else {
-                const currentYear = new Date().getFullYear() % 100;
-                const year = parseInt(form.expiryYear);
-                if (year < currentYear) {
-                    newErrors.expiryYear = "Kartın süresi dolmuş";
+                // Kart sahibi kontrolü
+                if (!form.cardHolder?.trim()) {
+                    newErrors.cardHolder = "Kart sahibi adı gerekli";
+                } else if (form.cardHolder.trim().length < 3) {
+                    newErrors.cardHolder = "Geçerli bir ad soyad girin";
                 }
-            }
 
-            // CVV kontrolü
-            if (!form.cvv) {
-                newErrors.cvv = "CVV gerekli";
-            } else if (form.cvv.length !== 3) {
-                newErrors.cvv = "CVV 3 haneli olmalıdır";
+                // Ay kontrolü
+                if (!form.expiryMonth) {
+                    newErrors.expiryMonth = "Ay gerekli";
+                } else {
+                    const month = parseInt(form.expiryMonth);
+                    if (month < 1 || month > 12) {
+                        newErrors.expiryMonth = "Geçersiz ay";
+                    }
+                }
+
+                // Yıl kontrolü
+                if (!form.expiryYear) {
+                    newErrors.expiryYear = "Yıl gerekli";
+                } else {
+                    const currentYear = new Date().getFullYear() % 100;
+                    const year = parseInt(form.expiryYear);
+                    if (year < currentYear) {
+                        newErrors.expiryYear = "Kartın süresi dolmuş";
+                    }
+                }
+
+                // CVV kontrolü
+                if (!form.cvv) {
+                    newErrors.cvv = "CVV gerekli";
+                } else if (form.cvv.length !== 3) {
+                    newErrors.cvv = "CVV 3 haneli olmalıdır";
+                }
             }
         }
 
@@ -290,12 +295,14 @@ const CreditCartClient = ({
 
         setIsProcessing(true);
 
-        // Ödeme işlemi simülasyonu
+        const provider = paymentOptions?.creditCard?.provider;
+
         setTimeout(() => {
             setIsProcessing(false);
             const paymentData: PaymentInfo = {
                 paymentMethod: selectedMethod!,
-                ...(selectedMethod === "creditCard" && {
+                provider: provider,
+                ...(selectedMethod === "creditCard" && provider !== "iyzico" && provider !== "paytr" && {
                     cardNumber: form.cardNumber,
                     cardHolder: form.cardHolder,
                     expiryMonth: form.expiryMonth,
@@ -307,7 +314,7 @@ const CreditCartClient = ({
                 }),
             };
             onComplete(paymentData);
-        }, 2000);
+        }, 500);
     };
 
     const getCardType = (number: string) => {
@@ -497,253 +504,298 @@ const CreditCartClient = ({
                             )}
                         </div>
 
-                        {/* Kredi Kartı Formu */}
+                        {/* Kredi Kartı Formu / Sağlayıcı Bilgisi */}
                         {selectedMethod === "creditCard" && (
                             <div className="border-t pt-6">
-                                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                                    <CreditCard className="w-5 h-5 text-cyan-600" />
-                                    Kart Bilgilerinizi Girin
-                                </h3>
-
-                                <form onSubmit={handleSubmit} className="space-y-6">
-                                    {/* Kart Numarası */}
-                                    <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-2.5">
-                                            Kart Numarası <span className="text-red-500">*</span>
-                                        </label>
-                                        <div className="relative">
-                                            <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                                                <CreditCard className="w-5 h-5 text-gray-400" />
-                                            </div>
-                                            <input
-                                                type="text"
-                                                value={formatCardNumber(form.cardNumber || "")}
-                                                onChange={handleCardNumberChange}
-                                                placeholder="1234 5678 9012 3456"
-                                                className={`w-full px-4 py-3.5 pl-12 pr-20 border rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all shadow-sm ${errors.cardNumber
-                                                    ? "border-red-500 bg-red-50"
-                                                    : "border-gray-200 bg-gray-50 focus:bg-white"
-                                                    }`}
-                                            />
-                                            {form.cardNumber && form.cardNumber.length > 0 && (
-                                                <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                                                    <div className="bg-gradient-to-r from-cyan-600 to-blue-700 px-3 py-1.5 rounded-md text-xs font-bold text-white shadow-sm">
-                                                        {getCardType(form.cardNumber)}
-                                                    </div>
+                                {(paymentOptions?.creditCard?.provider === "iyzico" || paymentOptions?.creditCard?.provider === "paytr") ? (
+                                    <div className="space-y-6">
+                                        <div className="bg-gradient-to-r from-cyan-50 to-blue-50 border border-cyan-200 rounded-xl p-6 shadow-sm">
+                                            <div className="flex items-center gap-3 mb-3">
+                                                <div className="w-10 h-10 bg-gradient-to-br from-cyan-600 to-blue-600 rounded-xl flex items-center justify-center text-white font-bold shadow-md">
+                                                    <Lock className="w-5 h-5" />
                                                 </div>
-                                            )}
-                                        </div>
-                                        {errors.cardNumber && (
-                                            <p className="text-red-500 text-xs mt-2 flex items-center gap-1">
-                                                <svg
-                                                    className="w-4 h-4"
-                                                    fill="currentColor"
-                                                    viewBox="0 0 20 20"
-                                                >
-                                                    <path
-                                                        fillRule="evenodd"
-                                                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                                                        clipRule="evenodd"
-                                                    />
-                                                </svg>
-                                                {errors.cardNumber}
-                                            </p>
-                                        )}
-                                    </div>
-
-                                    {/* Kart Sahibi */}
-                                    <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-2.5">
-                                            Kart Üzerindeki İsim{" "}
-                                            <span className="text-red-500">*</span>
-                                        </label>
-                                        <div className="relative">
-                                            <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                                                <User className="w-5 h-5 text-gray-400" />
+                                                <div>
+                                                    <h4 className="font-bold text-gray-900 text-lg uppercase">
+                                                        {paymentOptions.creditCard.provider} Güvenli Ödeme Altyapısı
+                                                    </h4>
+                                                    <p className="text-xs text-cyan-700 font-medium">256-bit SSL Şifreli Kart İframe / Checkout Formu</p>
+                                                </div>
                                             </div>
-                                            <input
-                                                type="text"
-                                                value={form.cardHolder || ""}
-                                                onChange={handleCardHolderChange}
-                                                placeholder="Ad Soyad"
-                                                className={`w-full px-4 py-3.5 pl-12 border rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all shadow-sm ${errors.cardHolder
-                                                    ? "border-red-500 bg-red-50"
-                                                    : "border-gray-200 bg-gray-50 focus:bg-white"
-                                                    }`}
-                                            />
-                                        </div>
-                                        {errors.cardHolder && (
-                                            <p className="text-red-500 text-xs mt-2 flex items-center gap-1">
-                                                <svg
-                                                    className="w-4 h-4"
-                                                    fill="currentColor"
-                                                    viewBox="0 0 20 20"
-                                                >
-                                                    <path
-                                                        fillRule="evenodd"
-                                                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                                                        clipRule="evenodd"
-                                                    />
-                                                </svg>
-                                                {errors.cardHolder}
+                                            <p className="text-sm text-gray-700 leading-relaxed">
+                                                Siparişinizi onayladıktan sonra kart bilgilerinizi bankanızın 3D Secure onay ekranı ile <strong>{paymentOptions.creditCard.provider.toUpperCase()}</strong> güvenli ödeme formunda gireceksiniz.
                                             </p>
-                                        )}
-                                    </div>
+                                        </div>
 
-                                    {/* Son Kullanma Tarihi ve CVV */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        {/* Son Kullanma Tarihi */}
-                                        <div>
-                                            <label className="block text-sm font-semibold text-gray-700 mb-2.5">
-                                                Son Kullanma Tarihi{" "}
-                                                <span className="text-red-500">*</span>
-                                            </label>
-                                            <div className="flex gap-3 items-center">
-                                                <div className="relative flex-1">
-                                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                                                        <Calendar className="w-4 h-4 text-gray-400" />
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSubmit()}
+                                            disabled={isProcessing}
+                                            className={`w-full py-4 rounded-xl font-semibold text-white transition-all items-center justify-center gap-2 shadow-md hover:shadow-xl hidden lg:flex ${isProcessing
+                                                ? "bg-gray-400 cursor-not-allowed"
+                                                : "bg-gradient-to-r from-cyan-600 to-blue-700 hover:from-cyan-700 hover:to-blue-800 transform hover:scale-[1.02] active:scale-[0.98]"
+                                                }`}
+                                        >
+                                            {isProcessing ? (
+                                                <>
+                                                    <div className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
+                                                    <span>İşlem Yapılıyor...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Lock className="w-5 h-5" />
+                                                    <span>Güvenli Ödeme Bağlantısı Oluştur</span>
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                                            <CreditCard className="w-5 h-5 text-cyan-600" />
+                                            Kart Bilgilerinizi Girin
+                                        </h3>
+
+                                        <form onSubmit={handleSubmit} className="space-y-6">
+                                            {/* Kart Numarası */}
+                                            <div>
+                                                <label className="block text-sm font-semibold text-gray-700 mb-2.5">
+                                                    Kart Numarası <span className="text-red-500">*</span>
+                                                </label>
+                                                <div className="relative">
+                                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                                                        <CreditCard className="w-5 h-5 text-gray-400" />
                                                     </div>
                                                     <input
                                                         type="text"
-                                                        value={form.expiryMonth || ""}
-                                                        onChange={handleExpiryMonthChange}
-                                                        onBlur={handleExpiryMonthBlur}
-                                                        placeholder="AA"
-                                                        maxLength={2}
-                                                        className={`w-full px-4 py-3.5 pl-10 border rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all shadow-sm text-center ${errors.expiryMonth
+                                                        value={formatCardNumber(form.cardNumber || "")}
+                                                        onChange={handleCardNumberChange}
+                                                        placeholder="1234 5678 9012 3456"
+                                                        className={`w-full px-4 py-3.5 pl-12 pr-20 border rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all shadow-sm ${errors.cardNumber
+                                                            ? "border-red-500 bg-red-50"
+                                                            : "border-gray-200 bg-gray-50 focus:bg-white"
+                                                            }`}
+                                                    />
+                                                    {form.cardNumber && form.cardNumber.length > 0 && (
+                                                        <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                                                            <div className="bg-gradient-to-r from-cyan-600 to-blue-700 px-3 py-1.5 rounded-md text-xs font-bold text-white shadow-sm">
+                                                                {getCardType(form.cardNumber)}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {errors.cardNumber && (
+                                                    <p className="text-red-500 text-xs mt-2 flex items-center gap-1">
+                                                        <svg
+                                                            className="w-4 h-4"
+                                                            fill="currentColor"
+                                                            viewBox="0 0 20 20"
+                                                        >
+                                                            <path
+                                                                fillRule="evenodd"
+                                                                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                                                                clipRule="evenodd"
+                                                            />
+                                                        </svg>
+                                                        {errors.cardNumber}
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            {/* Kart Sahibi */}
+                                            <div>
+                                                <label className="block text-sm font-semibold text-gray-700 mb-2.5">
+                                                    Kart Üzerindeki İsim{" "}
+                                                    <span className="text-red-500">*</span>
+                                                </label>
+                                                <div className="relative">
+                                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                                                        <User className="w-5 h-5 text-gray-400" />
+                                                    </div>
+                                                    <input
+                                                        type="text"
+                                                        value={form.cardHolder || ""}
+                                                        onChange={handleCardHolderChange}
+                                                        placeholder="Ad Soyad"
+                                                        className={`w-full px-4 py-3.5 pl-12 border rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all shadow-sm ${errors.cardHolder
                                                             ? "border-red-500 bg-red-50"
                                                             : "border-gray-200 bg-gray-50 focus:bg-white"
                                                             }`}
                                                     />
                                                 </div>
-                                                <span className="text-2xl text-gray-300 font-bold">
-                                                    /
-                                                </span>
-                                                <div className="flex-1">
-                                                    <input
-                                                        type="text"
-                                                        value={form.expiryYear || ""}
-                                                        onChange={handleExpiryYearChange}
-                                                        placeholder="YY"
-                                                        maxLength={2}
-                                                        className={`w-full px-4 py-3.5 border rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all shadow-sm text-center ${errors.expiryYear
-                                                            ? "border-red-500 bg-red-50"
-                                                            : "border-gray-200 bg-gray-50 focus:bg-white"
-                                                            }`}
-                                                    />
-                                                </div>
+                                                {errors.cardHolder && (
+                                                    <p className="text-red-500 text-xs mt-2 flex items-center gap-1">
+                                                        <svg
+                                                            className="w-4 h-4"
+                                                            fill="currentColor"
+                                                            viewBox="0 0 20 20"
+                                                        >
+                                                            <path
+                                                                fillRule="evenodd"
+                                                                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                                                                clipRule="evenodd"
+                                                            />
+                                                        </svg>
+                                                        {errors.cardHolder}
+                                                    </p>
+                                                )}
                                             </div>
-                                            {(errors.expiryMonth || errors.expiryYear) && (
-                                                <p className="text-red-500 text-xs mt-2 flex items-center gap-1">
-                                                    <svg
-                                                        className="w-4 h-4"
-                                                        fill="currentColor"
-                                                        viewBox="0 0 20 20"
-                                                    >
-                                                        <path
-                                                            fillRule="evenodd"
-                                                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                                                            clipRule="evenodd"
-                                                        />
-                                                    </svg>
-                                                    {errors.expiryMonth || errors.expiryYear}
-                                                </p>
-                                            )}
-                                        </div>
 
-                                        {/* CVV */}
-                                        <div>
-                                            <label className="block text-sm font-semibold text-gray-700 mb-2.5">
-                                                CVV/CVC <span className="text-red-500">*</span>
-                                            </label>
-                                            <div className="relative">
-                                                <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                                                    <Lock className="w-5 h-5 text-gray-400" />
-                                                </div>
-                                                <input
-                                                    type="password"
-                                                    value={form.cvv || ""}
-                                                    onChange={handleCvvChange}
-                                                    placeholder="123"
-                                                    maxLength={3}
-                                                    className={`w-full px-4 py-3.5 pl-12 pr-12 border rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all shadow-sm ${errors.cvv
-                                                        ? "border-red-500 bg-red-50"
-                                                        : "border-gray-200 bg-gray-50 focus:bg-white"
-                                                        }`}
-                                                />
-                                                <div className="absolute right-4 top-1/2 -translate-y-1/2 group">
-                                                    <div className="w-6 h-6 border-2 border-cyan-400 rounded-full flex items-center justify-center text-xs font-bold text-cyan-600 cursor-help hover:bg-cyan-50 transition">
-                                                        ?
+                                            {/* Son Kullanma Tarihi ve CVV */}
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                {/* Son Kullanma Tarihi */}
+                                                <div>
+                                                    <label className="block text-sm font-semibold text-gray-700 mb-2.5">
+                                                        Son Kullanma Tarihi{" "}
+                                                        <span className="text-red-500">*</span>
+                                                    </label>
+                                                    <div className="flex gap-3 items-center">
+                                                        <div className="relative flex-1">
+                                                            <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                                                <Calendar className="w-4 h-4 text-gray-400" />
+                                                            </div>
+                                                            <input
+                                                                type="text"
+                                                                value={form.expiryMonth || ""}
+                                                                onChange={handleExpiryMonthChange}
+                                                                onBlur={handleExpiryMonthBlur}
+                                                                placeholder="AA"
+                                                                maxLength={2}
+                                                                className={`w-full px-4 py-3.5 pl-10 border rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all shadow-sm text-center ${errors.expiryMonth
+                                                                    ? "border-red-500 bg-red-50"
+                                                                    : "border-gray-200 bg-gray-50 focus:bg-white"
+                                                                    }`}
+                                                            />
+                                                        </div>
+                                                        <span className="text-2xl text-gray-300 font-bold">
+                                                            /
+                                                        </span>
+                                                        <div className="flex-1">
+                                                            <input
+                                                                type="text"
+                                                                value={form.expiryYear || ""}
+                                                                onChange={handleExpiryYearChange}
+                                                                placeholder="YY"
+                                                                maxLength={2}
+                                                                className={`w-full px-4 py-3.5 border rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all shadow-sm text-center ${errors.expiryYear
+                                                                    ? "border-red-500 bg-red-50"
+                                                                    : "border-gray-200 bg-gray-50 focus:bg-white"
+                                                                    }`}
+                                                            />
+                                                        </div>
                                                     </div>
-                                                    <div className="hidden group-hover:block absolute right-0 top-10 w-56 bg-gray-900 text-white text-xs p-3 rounded-xl z-10 shadow-xl">
-                                                        <div className="font-semibold mb-1">CVV Nedir?</div>
-                                                        Kartınızın arkasındaki 3 haneli güvenlik kodu
-                                                        <div className="absolute -top-1 right-4 w-2 h-2 bg-gray-900 transform rotate-45"></div>
+                                                    {(errors.expiryMonth || errors.expiryYear) && (
+                                                        <p className="text-red-500 text-xs mt-2 flex items-center gap-1">
+                                                            <svg
+                                                                className="w-4 h-4"
+                                                                fill="currentColor"
+                                                                viewBox="0 0 20 20"
+                                                            >
+                                                                <path
+                                                                    fillRule="evenodd"
+                                                                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                                                                    clipRule="evenodd"
+                                                                />
+                                                            </svg>
+                                                            {errors.expiryMonth || errors.expiryYear}
+                                                        </p>
+                                                    )}
+                                                </div>
+
+                                                {/* CVV */}
+                                                <div>
+                                                    <label className="block text-sm font-semibold text-gray-700 mb-2.5">
+                                                        CVV/CVC <span className="text-red-500">*</span>
+                                                    </label>
+                                                    <div className="relative">
+                                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                                                            <Lock className="w-5 h-5 text-gray-400" />
+                                                        </div>
+                                                        <input
+                                                            type="password"
+                                                            value={form.cvv || ""}
+                                                            onChange={handleCvvChange}
+                                                            placeholder="123"
+                                                            maxLength={3}
+                                                            className={`w-full px-4 py-3.5 pl-12 pr-12 border rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all shadow-sm ${errors.cvv
+                                                                ? "border-red-500 bg-red-50"
+                                                                : "border-gray-200 bg-gray-50 focus:bg-white"
+                                                                }`}
+                                                        />
+                                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 group">
+                                                            <div className="w-6 h-6 border-2 border-cyan-400 rounded-full flex items-center justify-center text-xs font-bold text-cyan-600 cursor-help hover:bg-cyan-50 transition">
+                                                                ?
+                                                            </div>
+                                                            <div className="hidden group-hover:block absolute right-0 top-10 w-56 bg-gray-900 text-white text-xs p-3 rounded-xl z-10 shadow-xl">
+                                                                <div className="font-semibold mb-1">CVV Nedir?</div>
+                                                                Kartınızın arkasındaki 3 haneli güvenlik kodu
+                                                                <div className="absolute -top-1 right-4 w-2 h-2 bg-gray-900 transform rotate-45"></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    {errors.cvv && (
+                                                        <p className="text-red-500 text-xs mt-2 flex items-center gap-1">
+                                                            <svg
+                                                                className="w-4 h-4"
+                                                                fill="currentColor"
+                                                                viewBox="0 0 20 20"
+                                                            >
+                                                                <path
+                                                                    fillRule="evenodd"
+                                                                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                                                                    clipRule="evenodd"
+                                                                />
+                                                            </svg>
+                                                            {errors.cvv}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Ödeme Butonu */}
+                                            <button
+                                                type="submit"
+                                                disabled={isProcessing}
+                                                className={`w-full py-4 rounded-xl font-semibold text-white transition-all items-center justify-center gap-2 shadow-md hover:shadow-xl hidden lg:flex ${isProcessing
+                                                    ? "bg-gray-400 cursor-not-allowed"
+                                                    : "bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 transform hover:scale-[1.02] active:scale-[0.98]"
+                                                    }`}
+                                            >
+                                                {isProcessing ? (
+                                                    <>
+                                                        <div className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
+                                                        <span>İşlem Yapılıyor...</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Lock className="w-5 h-5" />
+                                                        <span>Güvenli Ödeme Yap</span>
+                                                    </>
+                                                )}
+                                            </button>
+
+                                            {/* Kabul Edilen Kartlar */}
+                                            <div className="pt-6 border-t">
+                                                <p className="text-sm text-gray-600 text-center mb-4 font-medium">
+                                                    Kabul Edilen Kartlar
+                                                </p>
+                                                <div className="flex justify-center items-center gap-3">
+                                                    <div className="w-16 h-11 bg-gradient-to-br from-blue-600 to-blue-400 rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-md hover:shadow-lg transition transform hover:scale-105">
+                                                        VISA
+                                                    </div>
+                                                    <div className="w-16 h-11 bg-gradient-to-br from-red-600 to-orange-500 rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-md hover:shadow-lg transition transform hover:scale-105">
+                                                        MC
+                                                    </div>
+                                                    <div className="w-16 h-11 bg-gradient-to-br from-blue-800 to-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-md hover:shadow-lg transition transform hover:scale-105">
+                                                        AMEX
+                                                    </div>
+                                                    <div className="w-16 h-11 bg-gradient-to-br from-purple-600 to-purple-400 rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-md hover:shadow-lg transition transform hover:scale-105">
+                                                        TROY
                                                     </div>
                                                 </div>
                                             </div>
-                                            {errors.cvv && (
-                                                <p className="text-red-500 text-xs mt-2 flex items-center gap-1">
-                                                    <svg
-                                                        className="w-4 h-4"
-                                                        fill="currentColor"
-                                                        viewBox="0 0 20 20"
-                                                    >
-                                                        <path
-                                                            fillRule="evenodd"
-                                                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                                                            clipRule="evenodd"
-                                                        />
-                                                    </svg>
-                                                    {errors.cvv}
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Ödeme Butonu */}
-                                    <button
-                                        type="submit"
-                                        disabled={isProcessing}
-                                        className={`w-full py-4 rounded-xl font-semibold text-white transition-all items-center justify-center gap-2 shadow-md hover:shadow-xl hidden lg:flex ${isProcessing
-                                            ? "bg-gray-400 cursor-not-allowed"
-                                            : "bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 transform hover:scale-[1.02] active:scale-[0.98]"
-                                            }`}
-                                    >
-                                        {isProcessing ? (
-                                            <>
-                                                <div className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
-                                                <span>İşlem Yapılıyor...</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Lock className="w-5 h-5" />
-                                                <span>Güvenli Ödeme Yap</span>
-                                            </>
-                                        )}
-                                    </button>
-
-                                    {/* Kabul Edilen Kartlar */}
-                                    <div className="pt-6 border-t">
-                                        <p className="text-sm text-gray-600 text-center mb-4 font-medium">
-                                            Kabul Edilen Kartlar
-                                        </p>
-                                        <div className="flex justify-center items-center gap-3">
-                                            <div className="w-16 h-11 bg-gradient-to-br from-blue-600 to-blue-400 rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-md hover:shadow-lg transition transform hover:scale-105">
-                                                VISA
-                                            </div>
-                                            <div className="w-16 h-11 bg-gradient-to-br from-red-600 to-orange-500 rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-md hover:shadow-lg transition transform hover:scale-105">
-                                                MC
-                                            </div>
-                                            <div className="w-16 h-11 bg-gradient-to-br from-blue-800 to-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-md hover:shadow-lg transition transform hover:scale-105">
-                                                AMEX
-                                            </div>
-                                            <div className="w-16 h-11 bg-gradient-to-br from-purple-600 to-purple-400 rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-md hover:shadow-lg transition transform hover:scale-105">
-                                                TROY
-                                            </div>
-                                        </div>
-                                    </div>
-                                </form>
+                                        </form>
+                                    </>
+                                )}
                             </div>
                         )}
 

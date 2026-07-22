@@ -14,3 +14,10 @@ export const submitProductReviewApi = (formData: FormData) =>
 
 export const getPaymentOptionsApi = (stringList: string[]) =>
   axios.post(`/payment-options/find/productsToPaymentOption`, { stringList });
+
+export const initializeIyzicoPaymentApi = (orderData: any) =>
+  axios.post(`/order/iyzico/payment/initialize`, orderData);
+
+export const initializePaytrPaymentApi = (orderData: any) =>
+  axios.post(`/order/paytr/payment/initialize`, orderData);
+

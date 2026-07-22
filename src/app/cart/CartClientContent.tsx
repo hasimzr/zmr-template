@@ -10,8 +10,13 @@ import LoginOrUserDataEntry from "@/components/LoginOrUserDataEntry";
 import AddressSelection from "@/components/AddressSelection";
 import SummaryOrder from "@/components/SummaryOrder";
 import CreditCart, { type PaymentInfo } from "@/components/CreditCart";
-import type { Address } from "@/types";
-import { addOrderApi } from "@/Api/controllers/OrderController";
+import type { Address, PaymentOptions } from "@/types";
+import {
+    addOrderApi,
+    getPaymentOptionsApi,
+    initializeIyzicoPaymentApi,
+    initializePaytrPaymentApi,
+} from "@/Api/controllers/OrderController";
 
 type OrderType = {
     firstName: string | null;
@@ -58,6 +63,8 @@ export default function CartClientContent({ orderIdParam }: CartClientContentPro
     const { isAuthenticated, user } = useAuth();
     const [step, setStep] = useState<number>(1);
     const [isGuest, setIsGuest] = useState<boolean>(false);
+    const [paymentHtml, setPaymentHtml] = useState<string | null>(null);
+    const [paymentOptions, setPaymentOptions] = useState<PaymentOptions | null>(null);
 
     const stepInfo = isAuthenticated
         ? [
@@ -111,6 +118,45 @@ export default function CartClientContent({ orderIdParam }: CartClientContentPro
         }
     }, [orderIdParam, isAuthenticated]);
 
+    // Ödeme seçeneklerini getir
+    useEffect(() => {
+        if (cartItems.length > 0) {
+            const stringList = cartItems.map((item) => item.product.id);
+            getPaymentOptionsApi(stringList)
+                .then((res) => setPaymentOptions(res.data))
+                .catch((err) => console.error("Ödeme seçenekleri alınamadı:", err));
+        }
+    }, [cartItems]);
+
+    // Script Yükleme Mantığı (Script Loader Effect)
+    useEffect(() => {
+        if (paymentHtml) {
+            const div = document.createElement("div");
+            div.innerHTML = paymentHtml;
+            const scripts = Array.from(div.getElementsByTagName("script"));
+
+            const loadScripts = async () => {
+                for (const oldScript of scripts) {
+                    await new Promise<void>((resolve) => {
+                        const newScript = document.createElement("script");
+                        newScript.type = "text/javascript";
+                        if (oldScript.src) {
+                            newScript.src = oldScript.src;
+                            newScript.onload = () => resolve();
+                            newScript.onerror = () => resolve();
+                            document.body.appendChild(newScript);
+                        } else {
+                            newScript.textContent = oldScript.textContent;
+                            document.body.appendChild(newScript);
+                            resolve();
+                        }
+                    });
+                }
+            };
+            loadScripts();
+        }
+    }, [paymentHtml]);
+
     const handleCheckout = () => {
         setStep(2);
     };
@@ -161,33 +207,63 @@ export default function CartClientContent({ orderIdParam }: CartClientContentPro
             })),
         };
 
-        if (paymentInfo?.paymentMethod === "creditCard") {
-            payload.cardNumber = paymentInfo.cardNumber;
-            payload.cardHolder = paymentInfo.cardHolder;
-            payload.expiryMonth = paymentInfo.expiryMonth;
-            payload.expiryYear = paymentInfo.expiryYear;
-            payload.cvv = paymentInfo.cvv;
-        }
+        try {
+            const provider = paymentInfo?.provider || paymentOptions?.creditCard?.provider;
 
-        if (
-            paymentInfo?.paymentMethod === "bankTransfer" &&
-            paymentInfo.selectedBank
-        ) {
-            payload.selectedBankName = paymentInfo.selectedBank.bankName;
-            payload.selectedBankAccount = paymentInfo.selectedBank.accountHolder;
-            payload.selectedBankIban = paymentInfo.selectedBank.iban;
-        }
-
-        let res = await addOrderApi(payload);
-        if (res) {
             if (paymentInfo?.paymentMethod === "creditCard") {
-                document.open();
-                document.write(res.data);
-                document.close();
-            } else {
-                setStep(isAuthenticated ? 5 : 6);
-                setOrderNumber(res.data);
+                if (provider === "paytr") {
+                    const res = await initializePaytrPaymentApi(payload);
+                    if (res?.data) {
+                        const htmlContent = typeof res.data === "string" ? res.data : JSON.stringify(res.data);
+                        setPaymentHtml(htmlContent);
+                    }
+                    return;
+                } else if (provider === "iyzico") {
+                    const res = await initializeIyzicoPaymentApi(payload);
+                    if (res?.data) {
+                        let htmlContent = typeof res.data === "string" ? res.data : JSON.stringify(res.data);
+                        htmlContent = htmlContent
+                            .replace(/(class|className)\s*=\s*\\?["']\s*popup\s*\\?["']/g, 'class="responsive"')
+                            .replace(/\\?["']?pageType\\?["']?\s*:\s*\\?["']\s*popup\s*\\?["']/g, '"pageType": "responsive"');
+                        setPaymentHtml(htmlContent);
+                    }
+                    return;
+                } else {
+                    payload.cardNumber = paymentInfo.cardNumber;
+                    payload.cardHolder = paymentInfo.cardHolder;
+                    payload.expiryMonth = paymentInfo.expiryMonth;
+                    payload.expiryYear = paymentInfo.expiryYear;
+                    payload.cvv = paymentInfo.cvv;
+                }
             }
+
+            if (
+                paymentInfo?.paymentMethod === "bankTransfer" &&
+                paymentInfo.selectedBank
+            ) {
+                payload.selectedBankName = paymentInfo.selectedBank.bankName;
+                payload.selectedBankAccount = paymentInfo.selectedBank.accountHolder;
+                payload.selectedBankIban = paymentInfo.selectedBank.iban;
+            }
+
+            let res = await addOrderApi(payload);
+            if (res) {
+                if (paymentInfo?.paymentMethod === "creditCard" && typeof res.data === "string" && res.data.includes("<")) {
+                    let htmlContent = res.data;
+                    if (htmlContent.includes("iyzico") || htmlContent.includes("iyzipay")) {
+                        htmlContent = htmlContent
+                            .replace(/(class|className)\s*=\s*\\?["']\s*popup\s*\\?["']/g, 'class="responsive"')
+                            .replace(/\\?["']?pageType\\?["']?\s*:\s*\\?["']\s*popup\s*\\?["']/g, '"pageType": "responsive"');
+                    }
+                    setPaymentHtml(htmlContent);
+                } else {
+                    setStep(isAuthenticated ? 5 : 6);
+                    setOrderNumber(res.data);
+                }
+            }
+        } catch (err: any) {
+            console.error("Ödeme hatası:", err);
+            toast.error(err?.response?.data?.message || err?.message || "Sipariş oluşturulurken bir hata oluştu");
         }
     };
 
@@ -285,7 +361,34 @@ export default function CartClientContent({ orderIdParam }: CartClientContentPro
                         </div>
                     </div>
                 </div>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {paymentHtml ? (
+                    <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-100 min-h-[500px] mb-8">
+                        <div className="mb-6 flex items-center justify-between pb-4 border-b border-gray-100">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-cyan-100 p-2.5 rounded-xl">
+                                    <Lock className="w-6 h-6 text-cyan-600" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-gray-900">Güvenli Ödeme Ekranı</h3>
+                                    <p className="text-sm text-gray-500">Lütfen ödeme bilgilerinizi tamamlayın</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setPaymentHtml(null)}
+                                className="text-sm font-medium text-gray-500 hover:text-cyan-600 underline"
+                            >
+                                Ödeme Yöntemini Değiştir / İptal
+                            </button>
+                        </div>
+                        <div className="iyzico-paytr-container min-h-[400px]">
+                            {/* İyzico'nun inject olacağı div ID'si */}
+                            <div id="iyzipay-checkout-form" className="responsive"></div>
+                            {/* HTML ve PayTR iframe içeriği */}
+                            <div dangerouslySetInnerHTML={{ __html: paymentHtml }} />
+                        </div>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {((isAuthenticated && step < 4) || (!isAuthenticated && step < 5)) && (
                         <div className="lg:col-span-2 space-y-4">
                             {step > 1 && step < 5 && (
@@ -805,7 +908,8 @@ export default function CartClientContent({ orderIdParam }: CartClientContentPro
                                 </div>
                             </div>
                         )}
-                </div>
+                    </div>
+                )}
             </div>
 
             {step === 1 && (
