@@ -340,10 +340,16 @@ const ProductDetailClient: React.FC<ProductDetailClientProps> = ({ initialProduc
                                                 </span>
                                             </div>
                                             <del className="text-xl text-gray-400">₺{totalPrice.toLocaleString("tr-TR")}</del>
-                                            <p className="text-4xl font-bold text-red-600">₺{discountedTotalPrice.toLocaleString("tr-TR")}</p>
+                                            <div className="flex items-baseline gap-2 flex-wrap">
+                                                <p className="text-4xl font-bold text-red-600">₺{discountedTotalPrice.toLocaleString("tr-TR")}</p>
+                                                <span className="text-xs sm:text-sm text-gray-500 font-medium">(KDV dahil toplam fiyattır)</span>
+                                            </div>
                                         </div>
                                     ) : (
-                                        <p className="text-4xl font-bold text-gray-900">₺{totalPrice.toLocaleString("tr-TR")}</p>
+                                        <div className="flex items-baseline gap-2 flex-wrap">
+                                            <p className="text-4xl font-bold text-gray-900">₺{totalPrice.toLocaleString("tr-TR")}</p>
+                                            <span className="text-xs sm:text-sm text-gray-500 font-medium">(KDV dahil toplam fiyattır)</span>
+                                        </div>
                                     )}
                                 </div>
 
