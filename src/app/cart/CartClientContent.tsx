@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ShoppingBag, Lock, Copy, Check } from "lucide-react";
 import toast from "react-hot-toast";
 import { useCart } from "@/context/CartContext";
+import { useBasketCalculation } from "@/hooks/useBasketCalculation";
 import { useAuth } from "@/context/AuthContext";
 import { useEffect, useState } from "react";
 import Basket from "@/components/Basket";
@@ -59,7 +60,13 @@ const CopyButton = ({ text, label }: { text: string; label: string }) => {
 };
 
 export default function CartClientContent({ orderIdParam }: CartClientContentProps) {
-    const { cartItems, clearCart, cartTotal } = useCart();
+    const { cartItems, clearCart } = useCart();
+    const [couponCode, setCouponCode] = useState("");
+    const { calculation, loading: calculationLoading, waitingForCoupon, error: calculationError, retry: retryCalculation } = useBasketCalculation(cartItems, couponCode);
+    const formatAmount = (amount: number | undefined) =>
+        amount == null
+            ? calculationLoading ? "Hesaplanıyor…" : "—"
+            : amount.toLocaleString("tr-TR", { style: "currency", currency: "TRY" });
     const { isAuthenticated, user } = useAuth();
     const [step, setStep] = useState<number>(1);
     const [isGuest, setIsGuest] = useState<boolean>(false);
@@ -181,11 +188,16 @@ export default function CartClientContent({ orderIdParam }: CartClientContentPro
     };
 
     const handlePaymentMethodComplete = async (payment: PaymentInfo) => {
+        if (!calculation) {
+            toast.error(calculationError || "Lütfen sepet tutarının hesaplanmasını bekleyin.");
+            return;
+        }
         setPaymentInfo(payment);
         const provider = payment.provider || paymentOptions?.creditCard?.provider;
 
         if (payment.paymentMethod === "creditCard" && (provider === "paytr" || provider === "iyzico")) {
             const payload: any = {
+                ...(calculation.coupon?.code ? { couponCode: calculation.coupon.code } : {}),
                 email: orderData.email,
                 firstName: orderData.firstName,
                 lastName: orderData.lastName,
@@ -242,7 +254,12 @@ export default function CartClientContent({ orderIdParam }: CartClientContentPro
     };
 
     const handleSubmitOrder = async () => {
+        if (!calculation) {
+            toast.error(calculationError || "Lütfen sepet tutarının hesaplanmasını bekleyin.");
+            return;
+        }
         const payload: any = {
+            ...(calculation.coupon?.code ? { couponCode: calculation.coupon.code } : {}),
             email: orderData.email,
             firstName: orderData.firstName,
             lastName: orderData.lastName,
@@ -665,7 +682,7 @@ export default function CartClientContent({ orderIdParam }: CartClientContentPro
                                                             </span>
                                                             <div className="flex items-center gap-2">
                                                                 <span className="text-sm font-bold text-purple-700">
-                                                                    ₺{(cartTotal).toLocaleString("tr-TR")}
+                                                                    {formatAmount(calculation?.payableTotal)}
                                                                 </span>
                                                                 <span className="text-[10px] text-gray-500 font-medium bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100">
                                                                     (KDV Dahil Toplam Fiyat)
@@ -793,13 +810,64 @@ export default function CartClientContent({ orderIdParam }: CartClientContentPro
                                             </div>
                                         </div>
 
+                                        <div className="mb-4">
+                                            <label htmlFor="coupon-code" className="mb-2 block text-sm font-semibold text-gray-700">
+                                                Kupon Kodu
+                                            </label>
+                                            <div className="flex gap-2">
+                                                <input
+                                                    id="coupon-code"
+                                                    type="text"
+                                                    value={couponCode}
+                                                    onChange={(event) => setCouponCode(event.target.value.toUpperCase())}
+                                                    placeholder="Kupon kodunuzu girin"
+                                                    autoCapitalize="characters"
+                                                    autoComplete="off"
+                                                    spellCheck={false}
+                                                    aria-describedby="coupon-status"
+                                                    aria-invalid={Boolean(couponCode.trim() && calculationError)}
+                                                    className="w-full min-w-0 rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-100"
+                                                />
+                                                {couponCode && (
+                                                    <button type="button" onClick={() => setCouponCode("")} className="px-2 text-sm font-semibold text-gray-500 hover:text-red-600">
+                                                        Kaldır
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <p id="coupon-status" role="status" className="mt-2 text-xs text-gray-500">
+                                                {waitingForCoupon
+                                                    ? "Yazmayı bıraktıktan 1 saniye sonra fiyat güncellenecek."
+                                                    : calculationLoading
+                                                    ? "Fiyat hesaplanıyor…"
+                                                    : calculationError
+                                                        ? "Fiyat hesaplanamadı. Lütfen aşağıdaki uyarıyı kontrol edin."
+                                                    : calculation?.coupon
+                                                        ? `${calculation.coupon.code} kuponu uygulandı.`
+                                                        : "Kupon kodunu yazmayı bıraktıktan 1 saniye sonra fiyat güncellenir."}
+                                            </p>
+                                        </div>
+
                                         <div className="space-y-3 mb-6">
+                                            {calculationError && (
+                                                <div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
+                                                    <p>{calculationError}</p>
+                                                    <button type="button" onClick={retryCalculation} className="mt-2 font-semibold underline">
+                                                        Tekrar Dene
+                                                    </button>
+                                                </div>
+                                            )}
                                             <div className="flex justify-between text-gray-700">
                                                 <span className="text-sm">Ara Toplam</span>
                                                 <span className="font-semibold">
-                                                    ₺{(cartTotal).toLocaleString("tr-TR")}
+                                                    {formatAmount(calculation?.subtotal)}
                                                 </span>
                                             </div>
+                                            {calculation && calculation.couponDiscountTotal > 0 && (
+                                                <div className="flex justify-between text-sm text-green-700">
+                                                    <span>Kupon İndirimi</span>
+                                                    <span className="font-semibold">−{formatAmount(calculation.couponDiscountTotal)}</span>
+                                                </div>
+                                            )}
                                             <div className="flex justify-between text-gray-700">
                                                 <span className="text-sm">Kargo</span>
                                                 <span className="text-green-600 font-semibold text-sm flex items-center gap-1">
@@ -826,9 +894,9 @@ export default function CartClientContent({ orderIdParam }: CartClientContentPro
                                                     </span>
                                                     <div className="text-right">
                                                         <div className="text-2xl font-bold text-cyan-600">
-                                                            ₺{(cartTotal).toLocaleString("tr-TR")}
+                                                            {formatAmount(calculation?.payableTotal)}
                                                         </div>
-                                                        <div className="text-xs text-gray-500">KDV Dahil</div>
+                                                        {calculation?.vatIncluded && <div className="text-xs text-gray-500">KDV Dahil</div>}
                                                     </div>
                                                 </div>
                                             </div>
@@ -972,7 +1040,7 @@ export default function CartClientContent({ orderIdParam }: CartClientContentPro
                     <div className="flex flex-col">
                         <span className="text-xs text-gray-500 font-medium">Toplam</span>
                         <span className="text-xl font-bold text-cyan-600">
-                            ₺{(cartTotal).toLocaleString("tr-TR")}
+                            {formatAmount(calculation?.payableTotal)}
                         </span>
                     </div>
                     <button
