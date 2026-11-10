@@ -341,6 +341,7 @@ const OrderDrawerClient: React.FC<OrderDrawerProps> = ({
                         <div className="space-y-3">
                             {order.orderProductList.map((item) => {
                                 const itemTotal = item.currentPrice * (item.quantity || 1);
+                                const productCode = item.productDto.code?.trim();
                                 return (
                                     <div
                                         key={item.id}
@@ -362,6 +363,11 @@ const OrderDrawerClient: React.FC<OrderDrawerProps> = ({
                                                 <p className="text-sm font-semibold text-gray-900 line-clamp-2 mb-1">
                                                     {item.productDto.title}
                                                 </p>
+                                                {productCode && (
+                                                    <p className="text-xs text-gray-500 mb-1">
+                                                        Ürün Kodu: <span className="font-medium text-gray-700 break-all">{productCode}</span>
+                                                    </p>
+                                                )}
                                                 <p className="text-xs text-gray-600">
                                                     {item.quantity || 1} Adet ×{" "}
                                                     {priceFormatter.format(item.currentPrice)}

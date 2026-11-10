@@ -38,6 +38,7 @@ const ProductDetailClient: React.FC<ProductDetailClientProps> = ({ initialProduc
     const { user, isAuthenticated } = useAuth();
 
     const [product] = useState<Product>(initialProduct);
+    const productCode = product.code?.trim();
     const [quantity, setQuantity] = useState(1);
     const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
     const [selectedImage, setSelectedImage] = useState<string>(getProductMainImage(initialProduct));
@@ -318,7 +319,14 @@ const ProductDetailClient: React.FC<ProductDetailClientProps> = ({ initialProduc
 
                             <div className="flex flex-col">
                                 <p className="text-sm text-cyan-600 font-semibold mb-2">{product.subcategory || "Ürün"}</p>
-                                <h1 className="text-3xl font-bold text-gray-900 mb-4">{product.title}</h1>
+                                <div className="mb-4">
+                                    <h1 className="text-3xl font-bold text-gray-900">{product.title}</h1>
+                                    {productCode && (
+                                        <p className="mt-2 text-sm text-gray-500">
+                                            Ürün Kodu: <span className="font-medium text-gray-700 break-all">{productCode}</span>
+                                        </p>
+                                    )}
+                                </div>
 
                                 <div className="flex items-center space-x-2 mb-6">
                                     <div className="flex">
